@@ -1,86 +1,128 @@
-# [HU-06] Consultar cita médica
+
+# [HU-06] Consultar cita médica 
+
 
 ## 📖 Historia de Usuario
 
-Como usuario
+Como administrador
 
-Quiero consultar una cita médica
+Quiero consultar las citas médicas registradas
 
-Para conocer los detalles de la atención programada
+Para visualizar la información de las citas y gestionar la agenda médica
+
 
 ## 🔁 Flujo Esperado
 
-* El usuario ingresa el identificador de la cita desde la interfaz.
-* El sistema consume el endpoint `/api/v1/citas/{id}`.
-* El backend valida que la cita exista.
-* Se consulta la información en la base de datos.
-* El sistema retorna los datos completos de la cita.
+- El administrador solicita la consulta de citas desde la interfaz.
+- El sistema consume el endpoint /api/v1/citas.
+- El backend valida la autenticación mediante token JWT.
+- Se validan los parámetros opcionales de búsqueda (fecha, paciente_id, medico_id, estado).
+- Se valida el formato de fecha (YYYY-MM-DD) en caso de ser enviado.
+- Se construye la consulta dinámica con filtros aplicados.
+- El sistema consulta la base de datos.
+- Se obtienen los registros de citas que cumplen los filtros.
+- Se ordenan los resultados por fecha y hora (ascendente o descendente).
+- Se implementa paginación (page, size).
+- Se retorna la lista de citas junto con metadatos de paginación.
+
 
 ## ✅ Criterios de Aceptación
 
 ### 1. 🔍 Estructura y lógica del servicio
 
-* [ ] Se expone un endpoint GET para consultar citas.
-* [ ] Se valida que la cita exista.
-* [ ] Se valida que el identificador sea correcto.
+- [ ] Se expone un endpoint GET para consultar citas.
+- [ ] Se requiere autenticación mediante JWT.
+- [ ] Se permiten filtros por fecha, paciente, médico y estado.
+- [ ] Se valida formato de fecha.
+- [ ] Se implementa paginación.
+- [ ] Se ordenan los resultados correctamente.
+
 
 ### 2. 📆 Estructura de la información
 
-* [ ] Se responde con la siguiente estructura en JSON:
+- [ ] Se responde con la siguiente estructura en JSON:
 
-```json id="hu06jsonok"
+```json
 {
-  "mensaje": "Cita consultada correctamente",
-  "data": {
-    "cita_id": 1,
-    "paciente_id": 1,
-    "medico_id": 1,
-    "fecha": "2026-03-25",
-    "hora": "10:00",
-    "estado": "PROGRAMADA"
+  "mensaje": "Consulta de citas exitosa",
+  "data": [
+    {
+      "cita_id": 1,
+      "paciente_id": 1,
+      "medico_id": 2,
+      "fecha": "2026-05-10",
+      "hora": "10:00",
+      "estado": "PROGRAMADA"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "size": 10,
+    "total_records": 1,
+    "total_pages": 1
   },
   "success": true
 }
-```
+````
 
-* [ ] Si ocurre error, el backend retorna:
+* [ ] Si no existen datos, el backend retorna:
 
-```json id="hu06jsonerror"
+```json id="hu06nodata"
 {
-  "mensaje": "La cita no existe",
+  "mensaje": "No existen citas registradas",
+  "data": [],
   "success": false
 }
 ```
 
 ## 🔧 Notas Técnicas
 
-## 🚀 Endpoint – Consultar Cita
+## 🚀 Endpoint – Consultar Citas Médicas
 
 * **Método HTTP:** `GET`
-* **Ruta:** `/api/v1/citas/{id}`
+* **Ruta:** `/api/v1/citas`
+* **Parámetros opcionales:**
+
+  * fecha (YYYY-MM-DD)
+  * paciente_id
+  * medico_id
+  * estado
+  * page
+  * size
 
 ## 📤 Ejemplo de Respuesta JSON
 
-```json id="hu06jsonexample"
+````json id="hu06example"
+```json
 {
-  "mensaje": "Cita consultada correctamente",
-  "data": {
-    "cita_id": 1,
-    "paciente_id": 1,
-    "medico_id": 1,
-    "fecha": "2026-03-25",
-    "hora": "10:00",
-    "estado": "PROGRAMADA"
+  "mensaje": "Consulta de citas exitosa",
+  "data": [
+    {
+      "cita_id": 1,
+      "paciente_id": 1,
+      "medico_id": 2,
+      "fecha": "2026-05-10",
+      "hora": "10:00",
+      "estado": "PROGRAMADA"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "size": 10,
+    "total_records": 1,
+    "total_pages": 1
   },
   "success": true
 }
 ```
+````
 
-* [ ] Si ocurre error:
+* [ ] Si no existen datos:
 
-```json id="hu06jsonexample2"
+```json id="hu06example2"
 {
-  "mensaje": "La cita no existe",
+  "mensaje": "No existen citas registradas",
+  "data": [],
   "success": false
 }
 ```
@@ -91,54 +133,90 @@ Para conocer los detalles de la atención programada
 
 ### ✅ Caso 1:
 
-* **Precondición:** La cita existe en la base de datos.
-* **Acción:** Ejecutar GET `/api/v1/citas/1`.
+* **Precondición:** Existen citas registradas.
+* **Acción:** Ejecutar GET /api/v1/citas.
 * **Resultado esperado:**
 
   * Código HTTP 200 OK
-  * Se retorna la información de la cita
-  * success = true
+  * Retorna lista de citas
+  * Campo success = true
 
-### ❌ Caso 2:
+### ✅ Caso 2:
 
-* **Precondición:** La cita no existe.
-* **Acción:** Ejecutar GET `/api/v1/citas/999`.
+* **Precondición:** Existen citas con filtro aplicado.
+* **Acción:** Ejecutar GET /api/v1/citas?fecha=2026-05-10.
 * **Resultado esperado:**
 
-  * Código HTTP 404 Not Found
-  * Mensaje de error
-  * success = false
+  * Retorna solo citas de la fecha indicada
 
 ### ❌ Caso 3:
 
-* **Precondición:** ID inválido.
-* **Acción:** Ejecutar GET `/api/v1/citas/abc`.
+* **Precondición:** No existen citas.
+* **Acción:** Ejecutar GET /api/v1/citas.
+* **Resultado esperado:**
+
+  * Código HTTP 200 OK
+  * Lista vacía
+  * success = false
+
+### ❌ Caso 4:
+
+* **Precondición:** Formato de fecha inválido.
+* **Acción:** Ejecutar GET /api/v1/citas?fecha=10-05-2026.
 * **Resultado esperado:**
 
   * Código HTTP 400 Bad Request
-  * Error de validación
+  * Mensaje: "Formato de fecha inválido"
+
+### ❌ Caso 5:
+
+* **Precondición:** Token inválido o no enviado.
+* **Acción:** Ejecutar endpoint sin autenticación.
+* **Resultado esperado:**
+
+  * Código HTTP 401 Unauthorized
+
+### ❌ Caso 6:
+
+* **Precondición:** Error en la base de datos.
+* **Acción:** Ejecutar endpoint bajo fallo.
+* **Resultado esperado:**
+
+  * Código HTTP 500 Internal Server Error
+  * Mensaje: "Error al consultar citas"
 
 ## ✅ Definición de Hecho
 
-# Historia: Consulta de Cita Médica
+#Historia: Consultar Citas Médicas
 
 ## 📦 Alcance Funcional
 
-* [ ] Permite consultar citas correctamente.
-* [ ] Retorna información completa.
+* [ ] Se consultan citas correctamente
+* [ ] Se aplican filtros dinámicos
+* [ ] Se implementa paginación
 
 ## 🧪 Pruebas Completadas
 
-* [ ] Pruebas de consulta exitosa
-* [ ] Pruebas de cita inexistente
-* [ ] Pruebas de validación
+* [ ] Pruebas de consulta general
+* [ ] Pruebas de filtros
+* [ ] Pruebas de paginación
+* [ ] Pruebas de autenticación
+* [ ] Pruebas de errores del sistema
 
 ## 📄 Documentación Técnica
 
 * [ ] Endpoint documentado en Swagger / OpenAPI
-* [ ] Se describen parámetros de entrada y salida
+* [ ] Se describe:
+
+  * Parámetros de búsqueda
+  * Paginación
+  * Estructura de respuesta
+  * Ejemplo de respuesta exitosa
+  * Ejemplo de error
 
 ## 🔐 Manejo de Errores
 
-* [ ] Se retornan códigos HTTP adecuados
-* [ ] Mensajes claros para el usuario
+* [ ] Se devuelve código HTTP 400 para validaciones
+* [ ] Se devuelve código HTTP 401 para autenticación
+* [ ] Se devuelve código HTTP 500 para errores internos
+* [ ] El campo `mensaje` contiene información clara y específica

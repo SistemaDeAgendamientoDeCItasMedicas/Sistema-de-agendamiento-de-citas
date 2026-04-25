@@ -1,91 +1,110 @@
-# [HU-05] Agendar cita médica
+
+# [HU-05] Agendar cita médica 
+
 
 ## 📖 Historia de Usuario
 
-Como paciente
+Como administrador
 
 Quiero agendar una cita médica
 
-Para recibir atención con un médico en una fecha y hora específica
+Para asignar un paciente a un médico en una fecha y hora específica cumpliendo las reglas del sistema
+
 
 ## 🔁 Flujo Esperado
 
-* El paciente selecciona un médico desde la interfaz.
-* El paciente selecciona una fecha y hora disponible.
-* El sistema consume el endpoint `/api/v1/citas`.
-* El backend valida que el paciente y el médico existan.
-* El sistema valida que el horario esté disponible.
-* Se registra la cita en la base de datos.
-* Se asigna un estado inicial "PROGRAMADA".
-* El sistema retorna confirmación del agendamiento.
+- El administrador ingresa los datos de la cita (paciente_id, medico_id, fecha, hora) desde la interfaz.
+- El sistema consume el endpoint /api/v1/citas.
+- El backend valida la autenticación mediante token JWT.
+- Se validan los campos obligatorios.
+- Se valida el formato de fecha (YYYY-MM-DD) y hora (HH:mm).
+- Se valida que la fecha no sea anterior a la fecha actual.
+- Se valida que el paciente y el médico existan en la base de datos.
+- Se valida que el médico tenga disponibilidad en el horario solicitado.
+- Se valida que el paciente no tenga otra cita en el mismo horario.
+- Se valida que la hora esté dentro del horario laboral permitido (ej: 08:00 – 18:00).
+- Se define una duración estándar de la cita (ej: 30 minutos).
+- Se verifica que no exista solapamiento de citas en ese rango de tiempo.
+- Se registra la cita en la base de datos con estado inicial "PROGRAMADA".
+- Se genera un identificador único para la cita.
+- El sistema retorna confirmación del agendamiento.
+
 
 ## ✅ Criterios de Aceptación
 
 ### 1. 🔍 Estructura y lógica del servicio
 
-* [ ] Se expone un endpoint POST para agendar citas.
-* [ ] Se valida que el paciente exista.
-* [ ] Se valida que el médico exista.
-* [ ] Se valida disponibilidad del horario.
-* [ ] No se permiten fechas pasadas.
+- [ ] Se expone un endpoint POST para agendar citas.
+- [ ] Se requiere autenticación mediante JWT.
+- [ ] Se validan los campos obligatorios.
+- [ ] Se valida formato de fecha y hora.
+- [ ] Se valida que la fecha sea futura.
+- [ ] Se valida existencia de paciente y médico.
+- [ ] Se valida disponibilidad del médico.
+- [ ] Se evita duplicidad de citas en el mismo horario.
+- [ ] Se valida horario laboral del médico.
+- [ ] Se controla solapamiento de citas.
+
 
 ### 2. 📆 Estructura de la información
 
-* [ ] Se responde con la siguiente estructura en JSON:
+- [ ] Se responde con la siguiente estructura en JSON:
 
-```json id="hu05jsonok"
+```json
 {
   "mensaje": "Cita agendada correctamente",
   "data": {
     "cita_id": 1,
     "paciente_id": 1,
-    "medico_id": 1,
-    "fecha": "2026-03-25",
+    "medico_id": 2,
+    "fecha": "2026-05-10",
     "hora": "10:00",
     "estado": "PROGRAMADA"
   },
   "success": true
 }
-```
+````
 
 * [ ] Si ocurre error, el backend retorna:
 
-```json id="hu05jsonerror"
+```json
 {
-  "mensaje": "El horario no está disponible",
+  "mensaje": "El médico no está disponible en ese horario",
   "success": false
 }
 ```
 
 ## 🔧 Notas Técnicas
 
-## 🚀 Endpoint – Agendar Cita
+## 🚀 Endpoint – Agendar Cita Médica
 
 * **Método HTTP:** `POST`
 * **Ruta:** `/api/v1/citas`
 
 ## 📤 Ejemplo de Respuesta JSON
 
-```json id="hu05jsonexample"
+````json
+```json
 {
   "mensaje": "Cita agendada correctamente",
   "data": {
     "cita_id": 1,
     "paciente_id": 1,
-    "medico_id": 1,
-    "fecha": "2026-03-25",
+    "medico_id": 2,
+    "fecha": "2026-05-10",
     "hora": "10:00",
     "estado": "PROGRAMADA"
   },
   "success": true
 }
 ```
+````
 
-* [ ] Si ocurre error:
+* [ ] Si ocurre error, el backend retorna:
 
-```json id="hu05jsonexample2"
+```json
 {
-  "mensaje": "El horario no está disponible",
+  "mensaje": "El médico no está disponible en ese horario",
   "success": false
 }
 ```
@@ -96,65 +115,102 @@ Para recibir atención con un médico en una fecha y hora específica
 
 ### ✅ Caso 1:
 
-* **Precondición:** El paciente y el médico existen y el horario está disponible.
-* **Acción:** Ejecutar POST `/api/v1/citas`.
+* **Precondición:** El paciente y el médico existen y están disponibles.
+* **Acción:** Ejecutar el endpoint POST /api/v1/citas.
 * **Resultado esperado:**
 
   * Código HTTP 201 Created
-  * Cita registrada correctamente
-  * Estado "PROGRAMADA"
-  * success = true
+  * Cita registrada con estado "PROGRAMADA"
+  * Retorna ID de la cita
+  * Campo success = true
 
 ### ❌ Caso 2:
 
-* **Precondición:** El horario ya está ocupado.
-* **Acción:** Ejecutar POST `/api/v1/citas`.
+* **Precondición:** Fecha en el pasado.
+* **Acción:** Ejecutar el endpoint POST /api/v1/citas.
 * **Resultado esperado:**
 
   * Código HTTP 400 Bad Request
-  * Mensaje de error
-  * success = false
+  * Mensaje: "No se permiten fechas pasadas"
 
 ### ❌ Caso 3:
 
-* **Precondición:** Fecha en el pasado.
-* **Acción:** Ejecutar POST `/api/v1/citas`.
+* **Precondición:** Médico ocupado en ese horario.
+* **Acción:** Ejecutar el endpoint POST /api/v1/citas.
 * **Resultado esperado:**
 
-  * Código HTTP 400
-  * Error de validación
+  * Código HTTP 409 Conflict
+  * Mensaje de conflicto de horario
 
 ### ❌ Caso 4:
 
-* **Precondición:** El paciente o médico no existen.
-* **Acción:** Ejecutar POST `/api/v1/citas`.
+* **Precondición:** Paciente con cita en el mismo horario.
+* **Acción:** Ejecutar el endpoint POST /api/v1/citas.
 * **Resultado esperado:**
 
-  * Código HTTP 404 Not Found
-  * Mensaje de error
+  * Código HTTP 409 Conflict
+  * Mensaje de duplicidad de cita
+
+### ❌ Caso 5:
+
+* **Precondición:** Hora fuera del horario laboral.
+* **Acción:** Ejecutar el endpoint POST /api/v1/citas.
+* **Resultado esperado:**
+
+  * Código HTTP 400 Bad Request
+  * Mensaje: "Horario fuera de rango permitido"
+
+### ❌ Caso 6:
+
+* **Precondición:** Token inválido o no enviado.
+* **Acción:** Ejecutar el endpoint sin autenticación.
+* **Resultado esperado:**
+
+  * Código HTTP 401 Unauthorized
+
+### ❌ Caso 7:
+
+* **Precondición:** Error en la base de datos.
+* **Acción:** Ejecutar el endpoint bajo fallo.
+* **Resultado esperado:**
+
+  * Código HTTP 500 Internal Server Error
+  * Mensaje: "Error al agendar la cita"
 
 ## ✅ Definición de Hecho
 
-# Historia: Agendar Cita Médica
+#Historia: Agendar Cita Médica
 
 ## 📦 Alcance Funcional
 
-* [ ] Permite agendar citas correctamente.
-* [ ] Valida disponibilidad.
-* [ ] Asigna estado inicial.
+* [ ] Se agenda la cita correctamente
+* [ ] Se valida disponibilidad del médico
+* [ ] Se valida existencia de paciente y médico
+* [ ] Se controla el estado de la cita
 
 ## 🧪 Pruebas Completadas
 
 * [ ] Pruebas de agendamiento exitoso
-* [ ] Pruebas de conflictos de horario
+* [ ] Pruebas de conflicto de horarios
 * [ ] Pruebas de validación de fechas
+* [ ] Pruebas de autenticación
+* [ ] Pruebas de errores del sistema
 
 ## 📄 Documentación Técnica
 
 * [ ] Endpoint documentado en Swagger / OpenAPI
-* [ ] Se describen parámetros de entrada y salida
+* [ ] Se describe:
+
+  * Propósito del endpoint
+  * Validaciones aplicadas
+  * Estados de la cita
+  * Ejemplo de respuesta exitosa
+  * Ejemplo de error
 
 ## 🔐 Manejo de Errores
 
-* [ ] Se retornan códigos HTTP adecuados
-* [ ] Mensajes claros para el usuario
+* [ ] Se devuelve código HTTP 400 para validaciones
+* [ ] Se devuelve código HTTP 401 para autenticación
+* [ ] Se devuelve código HTTP 409 para conflictos de horario
+* [ ] Se devuelve código HTTP 500 para errores internos
+* [ ] El campo `mensaje` contiene información clara y específica

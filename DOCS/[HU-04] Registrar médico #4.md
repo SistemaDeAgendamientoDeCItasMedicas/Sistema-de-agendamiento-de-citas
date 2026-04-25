@@ -1,4 +1,6 @@
-# [HU-04] Registrar médico
+
+# [HU-04] Registrar médico 
+
 
 ## 📖 Historia de Usuario
 
@@ -6,44 +8,50 @@ Como administrador
 
 Quiero registrar médicos en el sistema
 
-Para asignarles citas y gestionar su información profesional
+Para gestionar su información y asignarles citas médicas
+
 
 ## 🔁 Flujo Esperado
 
-* El administrador ingresa los datos del médico desde la interfaz.
-* El sistema consume el endpoint `/api/v1/medicos`.
-* El backend valida que el médico no esté registrado previamente.
-* Se almacena la información del médico en la base de datos.
-* Se genera un identificador único para el médico.
-* El sistema retorna confirmación del registro.
+- El administrador ingresa los datos del médico desde la interfaz.
+- El sistema consume el endpoint /api/v1/medicos.
+- El backend valida que los campos obligatorios estén completos.
+- Se valida el formato del documento y del correo.
+- El backend verifica que el médico no esté registrado previamente.
+- Se almacena la información del médico en la base de datos.
+- Se genera un identificador único para el médico.
+- El sistema retorna confirmación del registro.
+
 
 ## ✅ Criterios de Aceptación
 
 ### 1. 🔍 Estructura y lógica del servicio
 
-* [ ] Se expone un endpoint POST para registrar médicos.
-* [ ] Se valida que el número de licencia no exista previamente.
-* [ ] Se validan los campos obligatorios.
+- [ ] Se expone un endpoint POST para registrar médicos.
+- [ ] Se validan los campos obligatorios.
+- [ ] Se valida que el documento no exista previamente.
+- [ ] Se valida formato de datos (documento, correo).
+- [ ] Se genera un identificador único para el médico.
+
 
 ### 2. 📆 Estructura de la información
 
-* [ ] Se responde con la siguiente estructura en JSON:
+- [ ] Se responde con la siguiente estructura en JSON:
 
-```json id="hu04jsonok"
+```json
 {
   "mensaje": "Médico registrado correctamente",
   "data": {
     "medico_id": 1,
-    "nombre": "Dr. Carlos Ruiz",
-    "especialidad": "Cardiología"
+    "nombre": "Dr. Juan Perez"
   },
   "success": true
 }
-```
+````
 
 * [ ] Si ocurre error, el backend retorna:
 
-```json id="hu04jsonerror"
+```json
 {
   "mensaje": "El médico ya está registrado",
   "success": false
@@ -59,21 +67,22 @@ Para asignarles citas y gestionar su información profesional
 
 ## 📤 Ejemplo de Respuesta JSON
 
-```json id="hu04jsonexample"
+````json
+```json
 {
   "mensaje": "Médico registrado correctamente",
   "data": {
     "medico_id": 1,
-    "nombre": "Dr. Carlos Ruiz",
-    "especialidad": "Cardiología"
+    "nombre": "Dr. Juan Perez"
   },
   "success": true
 }
 ```
+````
 
-* [ ] Si ocurre error:
+* [ ] Si ocurre error, el backend retorna:
 
-```json id="hu04jsonexample2"
+```json
 {
   "mensaje": "El médico ya está registrado",
   "success": false
@@ -87,18 +96,18 @@ Para asignarles citas y gestionar su información profesional
 ### ✅ Caso 1:
 
 * **Precondición:** El médico no existe en la base de datos.
-* **Acción:** Ejecutar POST `/api/v1/medicos`.
+* **Acción:** Ejecutar el endpoint POST /api/v1/medicos.
 * **Resultado esperado:**
 
   * Código HTTP 201 Created
   * Médico registrado correctamente
-  * Se retorna ID del médico
-  * success = true
+  * Retorna ID del médico
+  * Campo success = true
 
 ### ❌ Caso 2:
 
-* **Precondición:** La licencia ya existe.
-* **Acción:** Ejecutar POST `/api/v1/medicos`.
+* **Precondición:** El documento del médico ya existe.
+* **Acción:** Ejecutar el endpoint POST /api/v1/medicos.
 * **Resultado esperado:**
 
   * Código HTTP 400 Bad Request
@@ -107,35 +116,53 @@ Para asignarles citas y gestionar su información profesional
 
 ### ❌ Caso 3:
 
-* **Precondición:** Datos incompletos.
-* **Acción:** Ejecutar POST `/api/v1/medicos`.
+* **Precondición:** Campos vacíos o inválidos.
+* **Acción:** Ejecutar el endpoint POST /api/v1/medicos.
 * **Resultado esperado:**
 
-  * Código HTTP 400
-  * Error de validación
+  * Código HTTP 400 Bad Request
+  * Validación de campos
+
+### ❌ Caso 4:
+
+* **Precondición:** Error en la base de datos.
+* **Acción:** Ejecutar el endpoint bajo condiciones de fallo.
+* **Resultado esperado:**
+
+  * Código HTTP 500 Internal Server Error
+  * Mensaje: "Error al registrar el médico"
 
 ## ✅ Definición de Hecho
 
-# Historia: Registro de Médico
+#Historia: Registro de Médico
 
 ## 📦 Alcance Funcional
 
-* [ ] El médico se registra correctamente.
-* [ ] Se valida duplicidad de licencia.
-* [ ] Se almacena en base de datos.
+* [ ] El médico se registra correctamente
+* [ ] Se valida duplicidad de documento
+* [ ] Se almacena en base de datos
 
 ## 🧪 Pruebas Completadas
 
-* [ ] Pruebas de registro exitoso
-* [ ] Pruebas de duplicidad
-* [ ] Pruebas de validación
+* [ ] Se ejecutaron pruebas de registro exitoso
+* [ ] Se validaron casos de duplicidad
+* [ ] Se probaron validaciones de entrada
+* [ ] Se probaron errores del sistema
 
 ## 📄 Documentación Técnica
 
 * [ ] Endpoint documentado en Swagger / OpenAPI
-* [ ] Se describen parámetros de entrada y salida
+* [ ] Se describe:
+
+  * Propósito del endpoint
+  * Campos de entrada y salida
+  * Ejemplo de respuesta exitosa
+  * Ejemplo de error
 
 ## 🔐 Manejo de Errores
 
-* [ ] Se retornan códigos HTTP adecuados
-* [ ] Mensajes claros para el usuario
+* [ ] Se devuelve código HTTP 400 para validaciones
+* [ ] Se devuelve código HTTP 500 para errores internos
+* [ ] El campo `mensaje` contiene información clara para el usuario
+
+
