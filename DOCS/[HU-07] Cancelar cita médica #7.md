@@ -201,3 +201,7 @@ Para liberar el espacio en la agenda y mantener actualizada la disponibilidad de
 * [ ] Se devuelve código HTTP 500 para errores internos
 * [ ] El campo `mensaje` contiene información clara y específica
 
+## Dependencias
+
+- Depende de: HU-02 Iniciar sesión
+- Depende de: HU-05 Agendar cita médica
