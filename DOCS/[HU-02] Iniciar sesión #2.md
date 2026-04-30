@@ -200,5 +200,7 @@ Para acceder de forma segura a mi cuenta y gestionar mis citas médicas
 * [ ] Se devuelve código HTTP 500 para errores internos
 * [ ] El campo `mensaje` contiene información clara y específica
 
+## Dependencias
 
+- Depende de: HU-01 Registrar usuario
 
