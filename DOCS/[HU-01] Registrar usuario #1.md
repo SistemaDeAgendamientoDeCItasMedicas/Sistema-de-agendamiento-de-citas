@@ -187,6 +187,8 @@ Para poder acceder a los servicios médicos de forma segura
 * [ ] Se devuelve código HTTP 500 para errores internos
 * [ ] El campo `mensaje` contiene información clara y específica
 
+## Dependencias
 
+- No tiene dependencias.
 
 
