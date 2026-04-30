@@ -165,4 +165,6 @@ Para gestionar su información y asignarles citas médicas
 * [ ] Se devuelve código HTTP 500 para errores internos
 * [ ] El campo `mensaje` contiene información clara para el usuario
 
+## Dependencias
 
+- Depende de: HU-01 Registrar usuario
