@@ -214,3 +214,9 @@ Para asignar un paciente a un médico en una fecha y hora específica cumpliendo
 * [ ] Se devuelve código HTTP 409 para conflictos de horario
 * [ ] Se devuelve código HTTP 500 para errores internos
 * [ ] El campo `mensaje` contiene información clara y específica
+
+## Dependencias
+
+- Depende de: HU-02 Iniciar sesión
+- Depende de: HU-03 Registrar médico
+- Depende de: HU-04 Registrar paciente
