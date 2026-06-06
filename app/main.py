@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
 from app.api.user_router import router as usuario_router
 from app.api.auth_router import router as auth_router
+from app.api.paciente_router import router as paciente_router
 
 app = FastAPI(
     title="Sistema de Agendamiento de Citas Médicas",
@@ -27,20 +28,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 # ─── Routers ──────────────────────────────────────────────────────────────────
 app.include_router(usuario_router)
 app.include_router(auth_router)
-
-
-# ─── Health check ─────────────────────────────────────────────────────────────
-@app.get("/", tags=["Root"])
-def root():
-    return {
-        "mensaje": "Sistema de Agendamiento de Citas Médicas — API activa",
-        "version": "1.0.0",
-        "docs": "/docs",
-    }
-
-
-# ─── Routers ─────────────────────────────────────────────────────────────────
-app.include_router(usuario_router)
+app.include_router(paciente_router)
 
 
 # ─── Health check ─────────────────────────────────────────────────────────────
