@@ -1,5 +1,6 @@
 from pydantic import BaseModel, field_validator
-from datetime import date, time, datetime, timezone
+from datetime import date, datetime, timezone
+from datetime import time as Time
 from enum import Enum
 
 
@@ -34,8 +35,8 @@ class CitaCreate(BaseModel):
         except ValueError:
             raise ValueError("Time format must be HH:MM")
 
-        hora_min = time(8, 0)
-        hora_max = time(18, 0)
+        hora_min = Time(8, 0)
+        hora_max = Time(18, 0)
 
         if not (hora_min <= hora <= hora_max):
             raise ValueError("Time must be between 08:00 and 18:00")
