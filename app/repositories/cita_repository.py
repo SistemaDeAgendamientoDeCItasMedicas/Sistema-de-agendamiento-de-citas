@@ -33,6 +33,46 @@ def obtener_por_id(cita_id: int) -> Optional[Cita]:
     return _citas.get(cita_id)
 
 
+def listar_con_filtros(
+    date_filter: Optional[date] = None,
+    patient_id: Optional[int] = None,
+    doctor_id: Optional[int] = None,
+    status: Optional[EstadoCita] = None,
+    page: int = 1,
+    size: int = 10,
+) -> tuple[list[Cita], int]:
+    """
+    Retorna citas filtradas y paginadas.
+    Retorna (lista_de_citas, total_registros).
+    """
+    resultados = list(_citas.values())
+
+    # Aplicar filtros dinámicos
+    if date_filter:
+        resultados = [c for c in resultados if c.date == date_filter]
+
+    if patient_id:
+        resultados = [c for c in resultados if c.patient_id == patient_id]
+
+    if doctor_id:
+        resultados = [c for c in resultados if c.doctor_id == doctor_id]
+
+    if status:
+        resultados = [c for c in resultados if c.status == status]
+
+    # Ordenar por fecha y hora ascendente
+    resultados.sort(key=lambda c: (c.date, c.time))
+
+    total = len(resultados)
+
+    # Aplicar paginación
+    inicio = (page - 1) * size
+    fin = inicio + size
+    resultados_paginados = resultados[inicio:fin]
+
+    return resultados_paginados, total
+
+
 def listar_todas() -> list[Cita]:
     """Retorna todas las citas registradas."""
     return list(_citas.values())
@@ -49,11 +89,8 @@ def listar_por_paciente(patient_id: int) -> list[Cita]:
 
 
 def existe_conflicto_medico(doctor_id: int, fecha: date, hora: str) -> bool:
-    """
-    Verifica si el médico ya tiene una cita en ese horario.
-    Considera solapamiento de ±30 minutos.
-    """
-    from datetime import datetime, timedelta
+    """Verifica si el médico ya tiene una cita en ese horario (±30 minutos)."""
+    from datetime import timedelta
     hora_solicitada = datetime.strptime(hora, "%H:%M")
     margen = timedelta(minutes=30)
 
@@ -70,11 +107,8 @@ def existe_conflicto_medico(doctor_id: int, fecha: date, hora: str) -> bool:
 
 
 def existe_conflicto_paciente(patient_id: int, fecha: date, hora: str) -> bool:
-    """
-    Verifica si el paciente ya tiene una cita en ese horario.
-    Considera solapamiento de ±30 minutos.
-    """
-    from datetime import datetime, timedelta
+    """Verifica si el paciente ya tiene una cita en ese horario (±30 minutos)."""
+    from datetime import timedelta
     hora_solicitada = datetime.strptime(hora, "%H:%M")
     margen = timedelta(minutes=30)
 
