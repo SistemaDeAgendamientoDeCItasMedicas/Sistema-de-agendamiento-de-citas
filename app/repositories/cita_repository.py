@@ -1,0 +1,98 @@
+from typing import Optional
+from datetime import datetime, timezone, date
+from app.domain.cita_model import Cita, CitaCreate, EstadoCita
+
+
+# ─── Almacenamiento en memoria ───────────────────────────────────────────────
+_citas: dict[int, Cita] = {}
+_siguiente_id: int = 1
+
+
+def guardar_cita(datos: CitaCreate) -> Cita:
+    """Persiste una nueva cita y retorna la entidad creada."""
+    global _siguiente_id
+
+    nueva = Cita(
+        id=_siguiente_id,
+        patient_id=datos.patient_id,
+        doctor_id=datos.doctor_id,
+        date=datos.date,
+        time=datos.time,
+        reason=datos.reason,
+        status=EstadoCita.SCHEDULED,
+        created_at=datetime.now(timezone.utc),
+    )
+
+    _citas[_siguiente_id] = nueva
+    _siguiente_id += 1
+    return nueva
+
+
+def obtener_por_id(cita_id: int) -> Optional[Cita]:
+    """Busca una cita por su ID."""
+    return _citas.get(cita_id)
+
+
+def listar_todas() -> list[Cita]:
+    """Retorna todas las citas registradas."""
+    return list(_citas.values())
+
+
+def listar_por_medico(doctor_id: int) -> list[Cita]:
+    """Retorna todas las citas de un médico específico."""
+    return [c for c in _citas.values() if c.doctor_id == doctor_id]
+
+
+def listar_por_paciente(patient_id: int) -> list[Cita]:
+    """Retorna todas las citas de un paciente específico."""
+    return [c for c in _citas.values() if c.patient_id == patient_id]
+
+
+def existe_conflicto_medico(doctor_id: int, fecha: date, hora: str) -> bool:
+    """
+    Verifica si el médico ya tiene una cita en ese horario.
+    Considera solapamiento de ±30 minutos.
+    """
+    from datetime import datetime, timedelta
+    hora_solicitada = datetime.strptime(hora, "%H:%M")
+    margen = timedelta(minutes=30)
+
+    for cita in _citas.values():
+        if (
+            cita.doctor_id == doctor_id
+            and cita.date == fecha
+            and cita.status not in [EstadoCita.CANCELLED]
+        ):
+            hora_cita = datetime.strptime(cita.time, "%H:%M")
+            if abs(hora_solicitada - hora_cita) < margen:
+                return True
+    return False
+
+
+def existe_conflicto_paciente(patient_id: int, fecha: date, hora: str) -> bool:
+    """
+    Verifica si el paciente ya tiene una cita en ese horario.
+    Considera solapamiento de ±30 minutos.
+    """
+    from datetime import datetime, timedelta
+    hora_solicitada = datetime.strptime(hora, "%H:%M")
+    margen = timedelta(minutes=30)
+
+    for cita in _citas.values():
+        if (
+            cita.patient_id == patient_id
+            and cita.date == fecha
+            and cita.status not in [EstadoCita.CANCELLED]
+        ):
+            hora_cita = datetime.strptime(cita.time, "%H:%M")
+            if abs(hora_solicitada - hora_cita) < margen:
+                return True
+    return False
+
+
+def actualizar_estado(cita_id: int, nuevo_estado: EstadoCita) -> Optional[Cita]:
+    """Actualiza el estado de una cita existente."""
+    cita = _citas.get(cita_id)
+    if cita:
+        cita.status = nuevo_estado
+    return cita
