@@ -1,10 +1,11 @@
 from fastapi import APIRouter, HTTPException, status, Depends, Query
 from typing import Optional
-from datetime import date
 from app.domain.cita_model import CitaCreate, CitaResponse, CitaData, EstadoCita
+from app.domain.reprogramar_model import ReprogramarCitaRequest
 from app.services import cita_service
 from app.services import consultar_cita_service
 from app.services import cancelar_cita_service
+from app.services import reprogramar_cita_service
 from app.services.cita_service import (
     PacienteNoEncontradoError,
     MedicoNoEncontradoError,
@@ -16,11 +17,18 @@ from app.services.cita_service import (
 )
 from app.services.consultar_cita_service import ErrorInternoError as ConsultaErrorInterno
 from app.services.cancelar_cita_service import (
-    CitaNoEncontradaError,
+    CitaNoEncontradaError as CancelCitaNoEncontrada,
     CitaYaCanceladaError,
     CitaCompletadaError,
     TiempoCancelacionExcedidoError,
     ErrorInternoError as CancelErrorInterno,
+)
+from app.services.reprogramar_cita_service import (
+    CitaNoEncontradaError as ReprogramarCitaNoEncontrada,
+    CitaNoReprogramableError,
+    ConflictoHorarioMedicoError as ReprogramarConflictoMedico,
+    ConflictoHorarioPacienteError as ReprogramarConflictoPaciente,
+    ErrorInternoError as ReprogramarErrorInterno,
 )
 from app.core.dependencies import get_current_user
 import math
@@ -216,18 +224,7 @@ def consultar_citas(
     summary="[HU-07] Cancelar cita médica",
     tags=["[HU-07] Cancelar Cita Médica"],
     responses={
-        200: {
-            "description": "Appointment cancelled successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Appointment cancelled successfully",
-                        "data": {"appointment_id": 1, "status": "CANCELLED"},
-                        "success": True,
-                    }
-                }
-            },
-        },
+        200: {"description": "Appointment cancelled successfully"},
         400: {"description": "Cancelación fuera del tiempo permitido"},
         401: {"description": "Token inválido o no enviado"},
         404: {"description": "Cita no encontrada"},
@@ -245,7 +242,6 @@ def cancelar_cita(
     **Requiere autenticación:** Bearer Token JWT.
 
     **Reglas de cancelación:**
-    - La cita debe existir en el sistema
     - La cita debe estar en estado `SCHEDULED` o `RESCHEDULED`
     - La cancelación debe realizarse con al menos 1 hora de anticipación
 
@@ -261,7 +257,7 @@ def cancelar_cita(
             },
             "success": True,
         }
-    except CitaNoEncontradaError as e:
+    except CancelCitaNoEncontrada as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"message": str(e), "success": False},
@@ -283,7 +279,97 @@ def cancelar_cita(
         )
 
 
-# ─── Endpoint auxiliar para pruebas ──────────────────────────────────────────
+# ─── HU-08: PATCH reschedule ──────────────────────────────────────────────────
+
+@router.patch(
+    "/{appointment_id}/reschedule",
+    status_code=status.HTTP_200_OK,
+    summary="[HU-08] Reprogramar cita médica",
+    tags=["[HU-08] Reprogramar Cita Médica"],
+    responses={
+        200: {
+            "description": "Appointment rescheduled successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Appointment rescheduled successfully",
+                        "data": {
+                            "appointment_id": 1,
+                            "patient_id": 1,
+                            "doctor_id": 2,
+                            "date": "2026-05-15",
+                            "time": "11:00",
+                            "reason": "Consulta general",
+                            "status": "RESCHEDULED",
+                        },
+                        "success": True,
+                    }
+                }
+            },
+        },
+        400: {"description": "Fecha pasada u hora fuera del horario laboral"},
+        401: {"description": "Token inválido o no enviado"},
+        404: {"description": "Cita no encontrada"},
+        409: {"description": "Cita no reprogramable o médico no disponible"},
+        500: {"description": "Error interno del servidor"},
+    },
+)
+def reprogramar_cita(
+    appointment_id: int,
+    datos: ReprogramarCitaRequest,
+    usuario_actual: dict = Depends(get_current_user),
+):
+    """
+    Reprograma una cita médica existente.
+
+    **Requiere autenticación:** Bearer Token JWT.
+
+    **Reglas de reprogramación:**
+    - La cita debe estar en estado `SCHEDULED` o `RESCHEDULED`
+    - La nueva fecha no puede ser anterior a la fecha actual
+    - La nueva hora debe estar entre 08:00 y 18:00
+    - El médico debe estar disponible en el nuevo horario
+
+    **Estado resultante:** `RESCHEDULED`
+    """
+    try:
+        cita = reprogramar_cita_service.reprogramar_cita(appointment_id, datos)
+        return {
+            "message": "Appointment rescheduled successfully",
+            "data": {
+                "appointment_id": cita.id,
+                "patient_id": cita.patient_id,
+                "doctor_id": cita.doctor_id,
+                "date": str(cita.date),
+                "time": cita.time,
+                "reason": cita.reason,
+                "status": cita.status,
+            },
+            "success": True,
+        }
+    except ReprogramarCitaNoEncontrada as e:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": str(e), "success": False},
+        )
+    except CitaNoReprogramableError as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(e), "success": False},
+        )
+    except (ReprogramarConflictoMedico, ReprogramarConflictoPaciente) as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(e), "success": False},
+        )
+    except ReprogramarErrorInterno as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={"message": str(e), "success": False},
+        )
+
+
+# ─── Endpoints auxiliares para pruebas ───────────────────────────────────────
 
 @router.patch(
     "/{appointment_id}/complete",
