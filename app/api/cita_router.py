@@ -340,3 +340,37 @@ def cancelar_cita(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": str(e), "success": False},
         )
+    # ─── Endpoint auxiliar para pruebas ──────────────────────────────────────────
+
+@router.patch(
+    "/{appointment_id}/complete",
+    summary="Completar cita (solo pruebas)",
+    tags=["[HU-07] Cancelar Cita Médica"],
+)
+def completar_cita(
+    appointment_id: int,
+    usuario_actual: dict = Depends(get_current_user),
+):
+    """
+    Marca una cita como completada.
+
+    **Uso:** endpoint auxiliar para probar el Caso 4 de HU-07
+    (cancelar cita completada → 409 Conflict).
+    """
+    from app.repositories import cita_repository
+    from app.domain.cita_model import EstadoCita
+
+    cita = cita_repository.obtener_por_id(appointment_id)
+
+    if not cita:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"message": "Appointment not found", "success": False},
+        )
+
+    cita_repository.actualizar_estado(appointment_id, EstadoCita.COMPLETED)
+
+    return {
+        "message": f"Appointment {appointment_id} marked as completed",
+        "success": True
+    }
