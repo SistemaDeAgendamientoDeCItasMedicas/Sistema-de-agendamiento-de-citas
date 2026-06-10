@@ -7,6 +7,7 @@ from app.services import consultar_cita_service
 from app.services import cancelar_cita_service
 from app.services import reprogramar_cita_service
 from app.services import listar_citas_service
+from app.services import eliminar_cita_service
 from app.services.cita_service import (
     PacienteNoEncontradoError,
     MedicoNoEncontradoError,
@@ -20,7 +21,7 @@ from app.services.consultar_cita_service import ErrorInternoError as ConsultaErr
 from app.services.cancelar_cita_service import (
     CitaNoEncontradaError as CancelCitaNoEncontrada,
     CitaYaCanceladaError,
-    CitaCompletadaError,
+    CitaCompletadaError as CancelCitaCompletada,
     TiempoCancelacionExcedidoError,
     ErrorInternoError as CancelErrorInterno,
 )
@@ -34,6 +35,12 @@ from app.services.reprogramar_cita_service import (
 from app.services.listar_citas_service import (
     TamanoPaginaExcedidoError,
     ErrorInternoError as ListarErrorInterno,
+)
+from app.services.eliminar_cita_service import (
+    CitaNoEncontradaError as EliminarCitaNoEncontrada,
+    CitaCompletadaError as EliminarCitaCompletada,
+    CitaYaEliminadaError,
+    ErrorInternoError as EliminarErrorInterno,
 )
 from app.core.dependencies import get_current_user
 import math
@@ -93,25 +100,13 @@ def agendar_cita(
             success=True,
         )
     except (PacienteNoEncontradoError, MedicoNoEncontradoError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"message": str(e), "success": False})
     except (PacienteInactivoError, MedicoInactivoError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail={"message": str(e), "success": False})
     except (ConflictoHorarioMedicoError, ConflictoHorarioPacienteError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"message": str(e), "success": False})
     except ErrorInternoError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": str(e), "success": False})
 
 
 # ─── HU-06: GET ──────────────────────────────────────────────────────────────
@@ -159,47 +154,24 @@ def consultar_citas(
 
     try:
         citas, total = consultar_cita_service.consultar_citas(
-            date_filter=date_filter,
-            patient_id=patient_id,
-            doctor_id=doctor_id,
-            status=status_filter,
-            page=page,
-            size=size,
+            date_filter=date_filter, patient_id=patient_id,
+            doctor_id=doctor_id, status=status_filter, page=page, size=size,
         )
-
         total_pages = math.ceil(total / size) if total > 0 else 0
 
         if not citas:
-            return {
-                "message": "No appointments found",
-                "data": [],
-                "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0},
-                "success": False,
-            }
+            return {"message": "No appointments found", "data": [],
+                    "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0}, "success": False}
 
         return {
             "message": "Appointments retrieved successfully",
-            "data": [
-                {
-                    "appointment_id": c.id,
-                    "patient_id": c.patient_id,
-                    "doctor_id": c.doctor_id,
-                    "date": str(c.date),
-                    "time": c.time,
-                    "reason": c.reason,
-                    "status": c.status,
-                }
-                for c in citas
-            ],
+            "data": [{"appointment_id": c.id, "patient_id": c.patient_id, "doctor_id": c.doctor_id,
+                      "date": str(c.date), "time": c.time, "reason": c.reason, "status": c.status} for c in citas],
             "pagination": {"page": page, "size": size, "total_records": total, "total_pages": total_pages},
             "success": True,
         }
-
     except ConsultaErrorInterno as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": str(e), "success": False})
 
 
 # ─── HU-07: PATCH cancel ─────────────────────────────────────────────────────
@@ -233,14 +205,11 @@ def cancelar_cita(
     """
     try:
         cita = cancelar_cita_service.cancelar_cita(appointment_id)
-        return {
-            "message": "Appointment cancelled successfully",
-            "data": {"appointment_id": cita.id, "status": cita.status},
-            "success": True,
-        }
+        return {"message": "Appointment cancelled successfully",
+                "data": {"appointment_id": cita.id, "status": cita.status}, "success": True}
     except CancelCitaNoEncontrada as e:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"message": str(e), "success": False})
-    except (CitaYaCanceladaError, CitaCompletadaError) as e:
+    except (CitaYaCanceladaError, CancelCitaCompletada) as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"message": str(e), "success": False})
     except TiempoCancelacionExcedidoError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": str(e), "success": False})
@@ -282,15 +251,9 @@ def reprogramar_cita(
         cita = reprogramar_cita_service.reprogramar_cita(appointment_id, datos)
         return {
             "message": "Appointment rescheduled successfully",
-            "data": {
-                "appointment_id": cita.id,
-                "patient_id": cita.patient_id,
-                "doctor_id": cita.doctor_id,
-                "date": str(cita.date),
-                "time": cita.time,
-                "reason": cita.reason,
-                "status": cita.status,
-            },
+            "data": {"appointment_id": cita.id, "patient_id": cita.patient_id,
+                     "doctor_id": cita.doctor_id, "date": str(cita.date),
+                     "time": cita.time, "reason": cita.reason, "status": cita.status},
             "success": True,
         }
     except ReprogramarCitaNoEncontrada as e:
@@ -311,45 +274,8 @@ def reprogramar_cita(
     summary="[HU-09] Listar citas médicas",
     tags=["[HU-09] Listar Citas Médicas"],
     responses={
-        200: {
-            "description": "Appointments listed successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Appointments listed successfully",
-                        "data": [
-                            {
-                                "appointment_id": 1,
-                                "patient_id": 1,
-                                "doctor_id": 2,
-                                "date": "2026-05-10",
-                                "time": "10:00",
-                                "reason": "Consulta general",
-                                "status": "SCHEDULED",
-                            }
-                        ],
-                        "pagination": {
-                            "page": 1,
-                            "size": 10,
-                            "total_records": 100,
-                            "total_pages": 10,
-                        },
-                        "success": True,
-                    }
-                }
-            },
-        },
-        400: {
-            "description": "Parámetros inválidos o tamaño excedido",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Page size exceeds maximum allowed limit of 50",
-                        "success": False,
-                    }
-                }
-            },
-        },
+        200: {"description": "Appointments listed successfully"},
+        400: {"description": "Parámetros inválidos o tamaño excedido"},
         401: {"description": "Token inválido o no enviado"},
         500: {"description": "Error interno del servidor"},
     },
@@ -360,13 +286,11 @@ def listar_citas(
     usuario_actual: dict = Depends(get_current_user),
 ):
     """
-    Lista todas las citas médicas registradas con paginación obligatoria.
+    Lista todas las citas médicas con paginación obligatoria.
 
     **Requiere autenticación:** Bearer Token JWT.
 
-    **Paginación:**
-    - `page`: número de página (default: 1, mínimo: 1)
-    - `size`: registros por página (default: 10, máximo: 50)
+    **Paginación:** page (default: 1), size (default: 10, máximo: 50)
 
     **Ordenamiento:** fecha y hora ascendente.
     """
@@ -375,37 +299,100 @@ def listar_citas(
         total_pages = math.ceil(total / size) if total > 0 else 0
 
         if not citas:
-            return {
-                "message": "No appointments registered",
-                "data": [],
-                "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0},
-                "success": False,
-            }
+            return {"message": "No appointments registered", "data": [],
+                    "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0}, "success": False}
 
         return {
             "message": "Appointments listed successfully",
-            "data": [
-                {
-                    "appointment_id": c.id,
-                    "patient_id": c.patient_id,
-                    "doctor_id": c.doctor_id,
-                    "date": str(c.date),
-                    "time": c.time,
-                    "reason": c.reason,
-                    "status": c.status,
-                }
-                for c in citas
-            ],
+            "data": [{"appointment_id": c.id, "patient_id": c.patient_id, "doctor_id": c.doctor_id,
+                      "date": str(c.date), "time": c.time, "reason": c.reason, "status": c.status} for c in citas],
             "pagination": {"page": page, "size": size, "total_records": total, "total_pages": total_pages},
             "success": True,
         }
-
     except TamanoPaginaExcedidoError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": str(e), "success": False})
+    except ListarErrorInterno as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": str(e), "success": False})
+
+
+# ─── HU-10: DELETE ───────────────────────────────────────────────────────────
+
+@router.delete(
+    "/{appointment_id}",
+    status_code=status.HTTP_200_OK,
+    summary="[HU-10] Eliminar cita médica",
+    tags=["[HU-10] Eliminar Cita Médica"],
+    responses={
+        200: {
+            "description": "Appointment deleted successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Appointment deleted successfully",
+                        "data": {"appointment_id": 1, "status": "DELETED"},
+                        "success": True,
+                    }
+                }
+            },
+        },
+        401: {"description": "Token inválido o no enviado"},
+        404: {
+            "description": "Cita no encontrada",
+            "content": {
+                "application/json": {
+                    "example": {"message": "Appointment not found", "success": False}
+                }
+            },
+        },
+        409: {
+            "description": "Cita completada o ya eliminada",
+            "content": {
+                "application/json": {
+                    "example": {"message": "Cannot delete a completed appointment", "success": False}
+                }
+            },
+        },
+        500: {"description": "Error interno del servidor"},
+    },
+)
+def eliminar_cita(
+    appointment_id: int,
+    usuario_actual: dict = Depends(get_current_user),
+):
+    """
+    Elimina lógicamente una cita médica (soft delete).
+
+    **Requiere autenticación:** Bearer Token JWT.
+
+    **Reglas de eliminación:**
+    - La cita debe existir en el sistema
+    - La cita no debe estar en estado `COMPLETED`
+    - La cita no debe estar ya en estado `DELETED`
+    - El registro se conserva para auditoría
+
+    **Estado resultante:** `DELETED`
+    """
+    try:
+        cita = eliminar_cita_service.eliminar_cita(appointment_id)
+        return {
+            "message": "Appointment deleted successfully",
+            "data": {
+                "appointment_id": cita.id,
+                "status": cita.status,
+            },
+            "success": True,
+        }
+    except EliminarCitaNoEncontrada as e:
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
+            status_code=status.HTTP_404_NOT_FOUND,
             detail={"message": str(e), "success": False},
         )
-    except ListarErrorInterno as e:
+    except (EliminarCitaCompletada, CitaYaEliminadaError) as e:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"message": str(e), "success": False},
+        )
+    except EliminarErrorInterno as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": str(e), "success": False},
@@ -426,7 +413,7 @@ def completar_cita(
     """
     Marca una cita como completada.
 
-    **Uso:** endpoint auxiliar para probar el Caso 4 de HU-07.
+    **Uso:** endpoint auxiliar para probar Caso 3 de HU-10 y Caso 4 de HU-07.
     """
     from app.repositories import cita_repository
     from app.domain.cita_model import EstadoCita
@@ -439,4 +426,4 @@ def completar_cita(
         )
 
     cita_repository.actualizar_estado(appointment_id, EstadoCita.COMPLETED)
-    return {"message": f"Appointment {appointment_id} marked as completed", "success": True}    
+    return {"message": f"Appointment {appointment_id} marked as completed", "success": True}
