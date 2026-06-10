@@ -25,12 +25,7 @@ from app.services.cancelar_cita_service import (
 from app.core.dependencies import get_current_user
 import math
 
-router = APIRouter(
-    prefix="/api/v1/citas",
-    tags=["[HU-05] Agendar Cita Médica",
-          "[HU-06] Consultar Citas Médicas",
-          "[HU-07] Cancelar Cita Médica"],
-)
+router = APIRouter(prefix="/api/v1/citas")
 
 
 # ─── HU-05: POST ─────────────────────────────────────────────────────────────
@@ -40,6 +35,7 @@ router = APIRouter(
     status_code=status.HTTP_201_CREATED,
     response_model=CitaResponse,
     summary="[HU-05] Agendar cita médica",
+    tags=["[HU-05] Agendar Cita Médica"],
     responses={
         201: {"description": "Appointment scheduled successfully"},
         400: {"description": "Fecha pasada u hora fuera del horario laboral"},
@@ -111,6 +107,7 @@ def agendar_cita(
     "",
     status_code=status.HTTP_200_OK,
     summary="[HU-06] Consultar citas médicas",
+    tags=["[HU-06] Consultar Citas Médicas"],
     responses={
         200: {"description": "Appointments retrieved successfully"},
         400: {"description": "Formato de fecha inválido"},
@@ -217,6 +214,7 @@ def consultar_citas(
     "/{appointment_id}/cancel",
     status_code=status.HTTP_200_OK,
     summary="[HU-07] Cancelar cita médica",
+    tags=["[HU-07] Cancelar Cita Médica"],
     responses={
         200: {
             "description": "Appointment cancelled successfully",
@@ -224,70 +222,17 @@ def consultar_citas(
                 "application/json": {
                     "example": {
                         "message": "Appointment cancelled successfully",
-                        "data": {
-                            "appointment_id": 1,
-                            "status": "CANCELLED",
-                        },
+                        "data": {"appointment_id": 1, "status": "CANCELLED"},
                         "success": True,
                     }
                 }
             },
         },
-        400: {
-            "description": "Cancelación fuera del tiempo permitido",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Cancellation deadline exceeded. Must cancel at least 1 hour in advance",
-                        "success": False,
-                    }
-                }
-            },
-        },
-        401: {
-            "description": "Token inválido o no enviado",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Invalid or missing token",
-                        "success": False,
-                    }
-                }
-            },
-        },
-        404: {
-            "description": "Cita no encontrada",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Appointment not found",
-                        "success": False,
-                    }
-                }
-            },
-        },
-        409: {
-            "description": "Cita ya cancelada o completada",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Appointment is already cancelled",
-                        "success": False,
-                    }
-                }
-            },
-        },
-        500: {
-            "description": "Error interno del servidor",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Error cancelling appointment",
-                        "success": False,
-                    }
-                }
-            },
-        },
+        400: {"description": "Cancelación fuera del tiempo permitido"},
+        401: {"description": "Token inválido o no enviado"},
+        404: {"description": "Cita no encontrada"},
+        409: {"description": "Cita ya cancelada o completada"},
+        500: {"description": "Error interno del servidor"},
     },
 )
 def cancelar_cita(
@@ -316,31 +261,29 @@ def cancelar_cita(
             },
             "success": True,
         }
-
     except CitaNoEncontradaError as e:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"message": str(e), "success": False},
         )
-
     except (CitaYaCanceladaError, CitaCompletadaError) as e:
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
             detail={"message": str(e), "success": False},
         )
-
     except TiempoCancelacionExcedidoError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(e), "success": False},
         )
-
     except CancelErrorInterno as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": str(e), "success": False},
         )
-    # ─── Endpoint auxiliar para pruebas ──────────────────────────────────────────
+
+
+# ─── Endpoint auxiliar para pruebas ──────────────────────────────────────────
 
 @router.patch(
     "/{appointment_id}/complete",
@@ -372,5 +315,5 @@ def completar_cita(
 
     return {
         "message": f"Appointment {appointment_id} marked as completed",
-        "success": True
+        "success": True,
     }
