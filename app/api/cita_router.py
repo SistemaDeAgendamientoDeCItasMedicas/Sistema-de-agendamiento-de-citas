@@ -6,6 +6,7 @@ from app.services import cita_service
 from app.services import consultar_cita_service
 from app.services import cancelar_cita_service
 from app.services import reprogramar_cita_service
+from app.services import listar_citas_service
 from app.services.cita_service import (
     PacienteNoEncontradoError,
     MedicoNoEncontradoError,
@@ -29,6 +30,10 @@ from app.services.reprogramar_cita_service import (
     ConflictoHorarioMedicoError as ReprogramarConflictoMedico,
     ConflictoHorarioPacienteError as ReprogramarConflictoPaciente,
     ErrorInternoError as ReprogramarErrorInterno,
+)
+from app.services.listar_citas_service import (
+    TamanoPaginaExcedidoError,
+    ErrorInternoError as ListarErrorInterno,
 )
 from app.core.dependencies import get_current_user
 import math
@@ -133,19 +138,13 @@ def consultar_citas(
     usuario_actual: dict = Depends(get_current_user),
 ):
     """
-    Consulta las citas médicas registradas con filtros opcionales y paginación.
+    Consulta citas con filtros opcionales y paginación.
 
     **Requiere autenticación:** Bearer Token JWT.
 
-    **Filtros opcionales:**
-    - `date`: fecha en formato YYYY-MM-DD
-    - `patient_id`: ID del paciente
-    - `doctor_id`: ID del médico
-    - `status`: SCHEDULED | CANCELLED | RESCHEDULED | COMPLETED
+    **Filtros opcionales:** date, patient_id, doctor_id, status
 
-    **Paginación:**
-    - `page`: número de página (default: 1)
-    - `size`: registros por página (default: 10, máximo: 100)
+    **Paginación:** page (default: 1), size (default: 10, máximo: 100)
     """
     date_filter = None
     if date:
@@ -155,10 +154,7 @@ def consultar_citas(
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail={
-                    "message": "Invalid date format. Must be YYYY-MM-DD",
-                    "success": False,
-                },
+                detail={"message": "Invalid date format. Must be YYYY-MM-DD", "success": False},
             )
 
     try:
@@ -177,12 +173,7 @@ def consultar_citas(
             return {
                 "message": "No appointments found",
                 "data": [],
-                "pagination": {
-                    "page": page,
-                    "size": size,
-                    "total_records": 0,
-                    "total_pages": 0,
-                },
+                "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0},
                 "success": False,
             }
 
@@ -200,12 +191,7 @@ def consultar_citas(
                 }
                 for c in citas
             ],
-            "pagination": {
-                "page": page,
-                "size": size,
-                "total_records": total,
-                "total_pages": total_pages,
-            },
+            "pagination": {"page": page, "size": size, "total_records": total, "total_pages": total_pages},
             "success": True,
         }
 
@@ -241,9 +227,7 @@ def cancelar_cita(
 
     **Requiere autenticación:** Bearer Token JWT.
 
-    **Reglas de cancelación:**
-    - La cita debe estar en estado `SCHEDULED` o `RESCHEDULED`
-    - La cancelación debe realizarse con al menos 1 hora de anticipación
+    **Reglas:** estado SCHEDULED o RESCHEDULED, mínimo 1 hora de anticipación.
 
     **Estado resultante:** `CANCELLED`
     """
@@ -251,35 +235,20 @@ def cancelar_cita(
         cita = cancelar_cita_service.cancelar_cita(appointment_id)
         return {
             "message": "Appointment cancelled successfully",
-            "data": {
-                "appointment_id": cita.id,
-                "status": cita.status,
-            },
+            "data": {"appointment_id": cita.id, "status": cita.status},
             "success": True,
         }
     except CancelCitaNoEncontrada as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"message": str(e), "success": False})
     except (CitaYaCanceladaError, CitaCompletadaError) as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"message": str(e), "success": False})
     except TiempoCancelacionExcedidoError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail={"message": str(e), "success": False})
     except CancelErrorInterno as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": str(e), "success": False})
 
 
-# ─── HU-08: PATCH reschedule ──────────────────────────────────────────────────
+# ─── HU-08: PATCH reschedule ─────────────────────────────────────────────────
 
 @router.patch(
     "/{appointment_id}/reschedule",
@@ -287,26 +256,7 @@ def cancelar_cita(
     summary="[HU-08] Reprogramar cita médica",
     tags=["[HU-08] Reprogramar Cita Médica"],
     responses={
-        200: {
-            "description": "Appointment rescheduled successfully",
-            "content": {
-                "application/json": {
-                    "example": {
-                        "message": "Appointment rescheduled successfully",
-                        "data": {
-                            "appointment_id": 1,
-                            "patient_id": 1,
-                            "doctor_id": 2,
-                            "date": "2026-05-15",
-                            "time": "11:00",
-                            "reason": "Consulta general",
-                            "status": "RESCHEDULED",
-                        },
-                        "success": True,
-                    }
-                }
-            },
-        },
+        200: {"description": "Appointment rescheduled successfully"},
         400: {"description": "Fecha pasada u hora fuera del horario laboral"},
         401: {"description": "Token inválido o no enviado"},
         404: {"description": "Cita no encontrada"},
@@ -324,11 +274,7 @@ def reprogramar_cita(
 
     **Requiere autenticación:** Bearer Token JWT.
 
-    **Reglas de reprogramación:**
-    - La cita debe estar en estado `SCHEDULED` o `RESCHEDULED`
-    - La nueva fecha no puede ser anterior a la fecha actual
-    - La nueva hora debe estar entre 08:00 y 18:00
-    - El médico debe estar disponible en el nuevo horario
+    **Reglas:** estado SCHEDULED o RESCHEDULED, nueva fecha futura, médico disponible.
 
     **Estado resultante:** `RESCHEDULED`
     """
@@ -348,21 +294,118 @@ def reprogramar_cita(
             "success": True,
         }
     except ReprogramarCitaNoEncontrada as e:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail={"message": str(e), "success": False})
     except CitaNoReprogramableError as e:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail={"message": str(e), "success": False},
-        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"message": str(e), "success": False})
     except (ReprogramarConflictoMedico, ReprogramarConflictoPaciente) as e:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail={"message": str(e), "success": False})
+    except ReprogramarErrorInterno as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"message": str(e), "success": False})
+
+
+# ─── HU-09: GET list ─────────────────────────────────────────────────────────
+
+@router.get(
+    "/list",
+    status_code=status.HTTP_200_OK,
+    summary="[HU-09] Listar citas médicas",
+    tags=["[HU-09] Listar Citas Médicas"],
+    responses={
+        200: {
+            "description": "Appointments listed successfully",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Appointments listed successfully",
+                        "data": [
+                            {
+                                "appointment_id": 1,
+                                "patient_id": 1,
+                                "doctor_id": 2,
+                                "date": "2026-05-10",
+                                "time": "10:00",
+                                "reason": "Consulta general",
+                                "status": "SCHEDULED",
+                            }
+                        ],
+                        "pagination": {
+                            "page": 1,
+                            "size": 10,
+                            "total_records": 100,
+                            "total_pages": 10,
+                        },
+                        "success": True,
+                    }
+                }
+            },
+        },
+        400: {
+            "description": "Parámetros inválidos o tamaño excedido",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "message": "Page size exceeds maximum allowed limit of 50",
+                        "success": False,
+                    }
+                }
+            },
+        },
+        401: {"description": "Token inválido o no enviado"},
+        500: {"description": "Error interno del servidor"},
+    },
+)
+def listar_citas(
+    page: int = Query(1, ge=1, description="Número de página (mínimo: 1)"),
+    size: int = Query(10, ge=1, description="Registros por página (máximo: 50)"),
+    usuario_actual: dict = Depends(get_current_user),
+):
+    """
+    Lista todas las citas médicas registradas con paginación obligatoria.
+
+    **Requiere autenticación:** Bearer Token JWT.
+
+    **Paginación:**
+    - `page`: número de página (default: 1, mínimo: 1)
+    - `size`: registros por página (default: 10, máximo: 50)
+
+    **Ordenamiento:** fecha y hora ascendente.
+    """
+    try:
+        citas, total = listar_citas_service.listar_citas(page=page, size=size)
+        total_pages = math.ceil(total / size) if total > 0 else 0
+
+        if not citas:
+            return {
+                "message": "No appointments registered",
+                "data": [],
+                "pagination": {"page": page, "size": size, "total_records": 0, "total_pages": 0},
+                "success": False,
+            }
+
+        return {
+            "message": "Appointments listed successfully",
+            "data": [
+                {
+                    "appointment_id": c.id,
+                    "patient_id": c.patient_id,
+                    "doctor_id": c.doctor_id,
+                    "date": str(c.date),
+                    "time": c.time,
+                    "reason": c.reason,
+                    "status": c.status,
+                }
+                for c in citas
+            ],
+            "pagination": {"page": page, "size": size, "total_records": total, "total_pages": total_pages},
+            "success": True,
+        }
+
+    except TamanoPaginaExcedidoError as e:
         raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail={"message": str(e), "success": False},
         )
-    except ReprogramarErrorInterno as e:
+    except ListarErrorInterno as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail={"message": str(e), "success": False},
@@ -383,14 +426,12 @@ def completar_cita(
     """
     Marca una cita como completada.
 
-    **Uso:** endpoint auxiliar para probar el Caso 4 de HU-07
-    (cancelar cita completada → 409 Conflict).
+    **Uso:** endpoint auxiliar para probar el Caso 4 de HU-07.
     """
     from app.repositories import cita_repository
     from app.domain.cita_model import EstadoCita
 
     cita = cita_repository.obtener_por_id(appointment_id)
-
     if not cita:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -398,8 +439,4 @@ def completar_cita(
         )
 
     cita_repository.actualizar_estado(appointment_id, EstadoCita.COMPLETED)
-
-    return {
-        "message": f"Appointment {appointment_id} marked as completed",
-        "success": True,
-    }
+    return {"message": f"Appointment {appointment_id} marked as completed", "success": True}    
