@@ -2,109 +2,138 @@
 
 ## Descripción del Proyecto
 
-Este proyecto consiste en el desarrollo de un Web Service REST para la gestión de citas médicas, permitiendo a los usuarios registrarse, autenticarse y administrar citas de manera eficiente.
-
-El sistema está diseñado bajo principios de arquitectura REST, facilitando la comunicación entre cliente y servidor mediante el uso de endpoints HTTP y estructuras de datos en formato JSON.
+API REST desarrollada con **Python y FastAPI** para la gestión integral de citas médicas. Permite registrar usuarios, autenticarse y administrar citas de manera eficiente, aplicando validaciones de negocio, control de acceso mediante JWT y arquitectura por capas.
 
 ---
 
 ## Objetivo General
 
-Desarrollar un servicio web que permita la gestión integral de citas médicas, garantizando validaciones de negocio, control de acceso y correcta manipulación de la información.
+Desarrollar un servicio web que permita la gestión integral de citas médicas, garantizando validaciones de negocio, control de acceso y correcta manipulación de la información mediante endpoints REST.
 
 ---
 
 ## Funcionalidades Principales
 
-* Registro de usuarios
-* Autenticación mediante credenciales
-* Registro de pacientes
-* Registro de médicos
-* Agendamiento de citas médicas
-* Consulta de citas
-* Cancelación de citas
-* Reprogramación de citas
-* Listado de citas por usuario
-* Eliminación de citas (administrador)
+- Registro y autenticación de usuarios con JWT
+- Registro de pacientes y médicos
+- Agendamiento de citas médicas con validación de disponibilidad
+- Consulta y listado de citas con filtros y paginación
+- Cancelación de citas con validación de anticipación mínima
+- Reprogramación de citas con control de disponibilidad
+- Eliminación lógica de citas (soft delete)
 
 ---
 
 ## Arquitectura del Sistema
 
-El sistema sigue una arquitectura basada en servicios REST, donde cada funcionalidad es expuesta mediante endpoints HTTP.
+El sistema implementa una **arquitectura por capas** con separación clara de responsabilidades:
 
-Se implementa una separación de responsabilidades entre:
+```
+app/
+├── api/              # Capa API — Routers y endpoints FastAPI
+├── services/         # Capa de Servicios — Lógica de negocio
+├── repositories/     # Capa de Repositorios — Acceso a datos
+├── domain/           # Capa de Dominio — Modelos Pydantic
+├── core/             # Utilidades transversales (JWT, dependencias)
+└── main.py           # Punto de entrada de la aplicación
+```
 
-* Controladores (gestión de solicitudes HTTP)
-* Servicios (lógica de negocio)
-* Repositorios (acceso a datos)
-
-Además, se contempla el uso de autenticación mediante tokens (JWT) para proteger los endpoints.
+| Capa | Responsabilidad |
+|------|----------------|
+| API | Recibe requests, valida entrada, retorna respuestas HTTP |
+| Services | Aplica reglas de negocio y coordina el flujo |
+| Repositories | CRUD en memoria (sin base de datos real) |
+| Domain | Modelos Pydantic con validaciones de datos |
 
 ---
 
 ## Tecnologías Utilizadas
 
-* Lenguaje: Java / Node.js (según tu implementación)
-* Framework: Spring Boot / Express
-* Base de datos: MySQL / PostgreSQL
-* Control de versiones: Git y GitHub
-* Pruebas: Postman
+| Tecnología | Versión | Uso |
+|------------|---------|-----|
+| Python | 3.11 | Lenguaje principal |
+| FastAPI | 0.111.0 | Framework web |
+| Uvicorn | 0.30.0 | Servidor ASGI |
+| Pydantic | 2.7.1 | Validación de datos |
+| python-jose | 3.3.0 | Generación y verificación de JWT |
+| bcrypt | 4.1.3 | Hash seguro de contraseñas |
+| Git / GitHub | — | Control de versiones |
+| Swagger UI | — | Documentación automática |
 
 ---
 
-## Estructura del Proyecto
+## Instalación y Ejecución
 
 ```bash
-src/
- ├── controllers/
- ├── services/
- ├── repositories/
- ├── models/
- └── config/
+# 1. Clonar el repositorio
+git clone https://github.com/SistemaDeAgendamientoDeCItasMedicas/Sistema-de-agendamiento-de-citas.git
+cd Sistema-de-agendamiento-de-citas
+
+# 2. Crear entorno virtual
+py -m venv venv
+.\venv\Scripts\activate      # Windows
+source venv/bin/activate     # Mac/Linux
+
+# 3. Instalar dependencias
+pip install -r requirements.txt
+
+# 4. Ejecutar el servidor
+uvicorn app.main:app --reload
 ```
+
+Swagger UI disponible en: **http://127.0.0.1:8000/docs**
 
 ---
 
-## Endpoints Principales
+## Endpoints
 
-### Autenticación
+### [HU-01] Usuarios
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/v1/users` | Registrar usuario |
 
-* POST `/api/v1/auth/login`
+### [HU-02] Autenticación
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/v1/auth/login` | Iniciar sesión — retorna JWT |
 
-### Usuarios
+### [HU-03] Pacientes
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/v1/pacientes` | Registrar paciente 🔒 |
 
-* POST `/api/v1/users`
+### [HU-04] Médicos
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/v1/medicos` | Registrar médico 🔒 |
 
-### Pacientes
+### [HU-05 al HU-10] Citas
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `POST` | `/api/v1/citas` | Agendar cita 🔒 |
+| `GET` | `/api/v1/citas` | Consultar citas con filtros 🔒 |
+| `GET` | `/api/v1/citas/list` | Listar citas con paginación 🔒 |
+| `PATCH` | `/api/v1/citas/{id}/cancel` | Cancelar cita 🔒 |
+| `PATCH` | `/api/v1/citas/{id}/reschedule` | Reprogramar cita 🔒 |
+| `DELETE` | `/api/v1/citas/{id}` | Eliminar cita (soft delete) 🔒 |
 
-* POST `/api/v1/pacientes`
-
-### Médicos
-
-* POST `/api/v1/medicos`
-
-### Citas
-
-* POST `/api/v1/citas`
-* GET `/api/v1/citas/{id}`
-* GET `/api/v1/citas`
-* PATCH `/api/v1/citas/{id}`
-* PUT `/api/v1/citas/{id}`
-* DELETE `/api/v1/citas/{id}`
+🔒 Requiere Bearer Token JWT
 
 ---
 
 ## Ejemplo de Respuesta
 
-```json id="readmejson1"
+```json
 {
-  "mensaje": "Cita agendada correctamente",
+  "message": "Appointment scheduled successfully",
   "data": {
-    "cita_id": 1,
-    "fecha": "2026-03-25",
-    "hora": "10:00",
-    "estado": "PROGRAMADA"
+    "appointment_id": 1,
+    "patient_id": 1,
+    "doctor_id": 2,
+    "date": "2026-12-15",
+    "time": "10:00",
+    "reason": "Consulta general",
+    "status": "SCHEDULED"
   },
   "success": true
 }
@@ -114,56 +143,70 @@ src/
 
 ## Seguridad
 
-El sistema contempla el uso de autenticación mediante tokens JWT, los cuales deben ser enviados en cada solicitud a los endpoints protegidos.
+- Autenticación mediante **Bearer Token JWT** (algoritmo HS256)
+- Contraseñas hasheadas con **bcrypt**
+- Token con expiración de **3600 segundos (1 hora)**
+- Endpoints protegidos validan el token en cada request
 
 ---
 
 ## Pruebas
 
-Las pruebas del sistema fueron realizadas utilizando Postman, validando:
+Las pruebas fueron realizadas directamente en **Swagger UI**, validando por cada Historia de Usuario:
 
-* Casos exitosos
-* Validaciones de datos
-* Manejo de errores
-* Respuestas del servidor
+- ✅ Casos exitosos
+- ❌ Validaciones de datos
+- ❌ Manejo de errores
+- ❌ Control de autenticación
+
+Las evidencias de cada caso de prueba están documentadas en los Pull Requests del repositorio.
 
 ---
 
 ## Control de Versiones
 
-Se utilizó Git como sistema de control de versiones, implementando el uso de ramas:
+Se utilizó Git con el siguiente flujo de ramas:
 
-* main
-* development
-* feature/*
+```
+main          ← producción / entrega final
+staging       ← pre-producción / QA
+testing       ← evidencias de pruebas
+development   ← base de trabajo
+HU-XX-...     ← rama por cada Historia de Usuario
+```
 
-Se gestionaron los cambios mediante Pull Requests, asegurando revisión de código y correcta integración.
+Cada HU siguió el flujo:
+```
+HU-XX → staging → (PR con evidencias) → testing → main
+```
 
 ---
 
 ## Metodología de Trabajo
 
-Se implementó una metodología basada en Kanban, organizando el trabajo en:
+Se implementó **Kanban** con GitHub Projects, organizando el trabajo en:
 
-* Backlog
-* En progreso
-* En pruebas
-* Finalizado
-
-Cada funcionalidad fue desarrollada como una historia de usuario independiente.
+| Estado | Descripción |
+|--------|-------------|
+| To Do | HU pendiente de iniciar |
+| In Progress | HU en desarrollo |
+| Gestion de Integración | HU en staging |
+| Testing | HU en revisión con evidencias |
+| Done | HU completada y mergeada |
 
 ---
 
-## Autor
+## Autores
 
 Proyecto desarrollado por:
 
-* Sebastian Andres Garcia Payares
+- **Sebastian Andres Garcia Payares** — Desarrollo backend
+- **Camilo Parada** — Testing y evidencias
 
 ---
 
 ## Conclusión
 
-El sistema desarrollado permite la gestión eficiente de citas médicas mediante un enfoque estructurado, validando reglas de negocio y asegurando la integridad de la información.
+El sistema desarrollado permite la gestión eficiente de citas médicas mediante un enfoque estructurado con arquitectura por capas, validaciones de negocio robustas, autenticación JWT y documentación automática con Swagger. Las 10 historias de usuario fueron implementadas y probadas siguiendo un flujo profesional de desarrollo con Git y Kanban.
 
 Además, el uso de buenas prácticas de desarrollo y control de versiones permite que el sistema sea escalable y mantenible.
