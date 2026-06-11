@@ -9,6 +9,7 @@ class EstadoCita(str, Enum):
     CANCELLED = "CANCELLED"
     RESCHEDULED = "RESCHEDULED"
     COMPLETED = "COMPLETED"
+    DELETED = "DELETED"          # ← nuevo para HU-10 (soft delete)
 
 
 # ─── Entrada ─────────────────────────────────────────────────────────────────

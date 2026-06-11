@@ -1,5 +1,5 @@
 from typing import Optional
-from datetime import datetime, timezone, date
+from datetime import datetime, timezone, date, timedelta
 from app.domain.cita_model import Cita, CitaCreate, EstadoCita
 
 
@@ -33,6 +33,34 @@ def obtener_por_id(cita_id: int) -> Optional[Cita]:
     return _citas.get(cita_id)
 
 
+def listar_con_filtros(
+    date_filter: Optional[date] = None,
+    patient_id: Optional[int] = None,
+    doctor_id: Optional[int] = None,
+    status: Optional[EstadoCita] = None,
+    page: int = 1,
+    size: int = 10,
+) -> tuple[list[Cita], int]:
+    """Retorna citas filtradas y paginadas."""
+    resultados = list(_citas.values())
+
+    if date_filter:
+        resultados = [c for c in resultados if c.date == date_filter]
+    if patient_id:
+        resultados = [c for c in resultados if c.patient_id == patient_id]
+    if doctor_id:
+        resultados = [c for c in resultados if c.doctor_id == doctor_id]
+    if status:
+        resultados = [c for c in resultados if c.status == status]
+
+    resultados.sort(key=lambda c: (c.date, c.time))
+    total = len(resultados)
+
+    inicio = (page - 1) * size
+    fin = inicio + size
+    return resultados[inicio:fin], total
+
+
 def listar_todas() -> list[Cita]:
     """Retorna todas las citas registradas."""
     return list(_citas.values())
@@ -48,16 +76,19 @@ def listar_por_paciente(patient_id: int) -> list[Cita]:
     return [c for c in _citas.values() if c.patient_id == patient_id]
 
 
-def existe_conflicto_medico(doctor_id: int, fecha: date, hora: str) -> bool:
-    """
-    Verifica si el médico ya tiene una cita en ese horario.
-    Considera solapamiento de ±30 minutos.
-    """
-    from datetime import datetime, timedelta
+def existe_conflicto_medico(
+    doctor_id: int,
+    fecha: date,
+    hora: str,
+    excluir_cita_id: Optional[int] = None,
+) -> bool:
+    """Verifica si el médico ya tiene una cita en ese horario (±30 minutos)."""
     hora_solicitada = datetime.strptime(hora, "%H:%M")
     margen = timedelta(minutes=30)
 
     for cita in _citas.values():
+        if excluir_cita_id and cita.id == excluir_cita_id:
+            continue
         if (
             cita.doctor_id == doctor_id
             and cita.date == fecha
@@ -69,16 +100,19 @@ def existe_conflicto_medico(doctor_id: int, fecha: date, hora: str) -> bool:
     return False
 
 
-def existe_conflicto_paciente(patient_id: int, fecha: date, hora: str) -> bool:
-    """
-    Verifica si el paciente ya tiene una cita en ese horario.
-    Considera solapamiento de ±30 minutos.
-    """
-    from datetime import datetime, timedelta
+def existe_conflicto_paciente(
+    patient_id: int,
+    fecha: date,
+    hora: str,
+    excluir_cita_id: Optional[int] = None,
+) -> bool:
+    """Verifica si el paciente ya tiene una cita en ese horario (±30 minutos)."""
     hora_solicitada = datetime.strptime(hora, "%H:%M")
     margen = timedelta(minutes=30)
 
     for cita in _citas.values():
+        if excluir_cita_id and cita.id == excluir_cita_id:
+            continue
         if (
             cita.patient_id == patient_id
             and cita.date == fecha
@@ -95,4 +129,14 @@ def actualizar_estado(cita_id: int, nuevo_estado: EstadoCita) -> Optional[Cita]:
     cita = _citas.get(cita_id)
     if cita:
         cita.status = nuevo_estado
+    return cita
+
+
+def reprogramar_cita(cita_id: int, nueva_fecha: date, nueva_hora: str) -> Optional[Cita]:
+    """Actualiza fecha, hora y estado de una cita existente."""
+    cita = _citas.get(cita_id)
+    if cita:
+        cita.date = nueva_fecha
+        cita.time = nueva_hora
+        cita.status = EstadoCita.RESCHEDULED
     return cita
